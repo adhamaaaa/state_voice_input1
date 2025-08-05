@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voice Input to Colab</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Voice Input for State</h1>
+    <button id="start-btn">Start Speaking</button>
+    <p id="status">Press the button and say a state name.</p>
+    <p>Recognized State: <span id="result" style="font-weight: bold;"></span></p>
+
+    <script>
+        const startBtn = document.getElementById('start-btn');
+        const status = document.getElementById('status');
+        const resultSpan = document.getElementById('result');
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (!SpeechRecognition) {
+            status.textContent = 'Speech Recognition API is not supported in this browser.';
+            startBtn.disabled = true;
+        } else {
+            const recognition = new SpeechRecognition();
+
+            // recognition.continuous = false; // Set to true for continuous recognition
+            recognition.lang = 'en-US';
+            // recognition.interimResults = true; // Set to true to get interim results
+            recognition.maxAlternatives = 1;
+
+            startBtn.addEventListener('click', () => {
+                resultSpan.textContent = ''; // Clear previous result
+                status.textContent = 'Listening... Speak now.';
+                recognition.start();
+            });
+
+            recognition.onresult = (event) => {
+                const speechResult = event.results[0][0].transcript;
+                resultSpan.textContent = speechResult;
+                status.textContent = 'Text recognized. Sending to Colab...';
+                sendTextToColab(speechResult);
+            };
+
+            recognition.onspeechend = () => {
+                status.textContent = 'Speech ended. Processing...';
+                recognition.stop();
+            };
+
+            recognition.onend = () => {
+                if (status.textContent === 'Speech ended. Processing...') {
+                     // Status is updated in onresult, so if onend fires right after onspeechend
+                     // and before sendTextToColab finishes, we don't want to reset the status.
+                } else {
+                   status.textContent = 'Press "Start Speaking" to try again.';
+                }
+
+            };
+
+            recognition.onerror = (event) => {
+                status.textContent = 'Error occurred in recognition: ' + event.error;
+                console.error('Speech recognition error:', event.error);
+            };
+
+            function sendTextToColab(text) {
+                const data = new URLSearchParams();
+                data.append('text', text);
+
+                // IMPORTANT: Replace with your actual Colab tunnel URL (e.g., from the ngrok or similar output)
+                // When you run the Python server cell in Colab, look for a public URL provided.
+                const colabUrl = 'YOUR_COLAB_TUNNEL_URL';
+
+                fetch(colabUrl, {
+                    method: 'POST',
+                    body: data
+                })
+                .then(response => {
+                    if (response.ok) {
+                        console.log('Text sent successfully to Colab');
+                        status.textContent = 'Text sent successfully!';
+                    } else {
+                        console.error('Failed to send text to Colab:', response.status, response.statusText);
+                        status.textContent = 'Failed to send text.';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error sending text to Colab:', error);
+                    status.textContent = 'Error sending text.';
+                });
+            }
+        }
+    </script>
+</body>
+</html>
